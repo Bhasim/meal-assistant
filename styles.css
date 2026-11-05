@@ -134,6 +134,22 @@ body{background:radial-gradient(ellipse 80% 550px at 68% 0,#375c2680,transparent
 /* Match the daily carbohydrate card exactly across the guidance sections. */
 :root[data-theme=light] .quiet-details{background:linear-gradient(135deg,rgba(232,242,228,.88),rgba(255,255,255,.68));border-color:#cfe0d2}
 :root[data-theme=light] .quiet-details .recipe-card{background:linear-gradient(135deg,rgba(232,242,228,.78),rgba(255,255,255,.58));border-color:#cfe0d2}
+
+/* Dark mode must never inherit the light-mode black-text rule. */
+:root[data-theme=dark] .quiet-details,
+:root[data-theme=dark] .quiet-details>summary,
+:root[data-theme=dark] .quiet-details .section-heading h2,
+:root[data-theme=dark] .quiet-details .eyebrow,
+:root[data-theme=dark] .quiet-details .small,
+:root[data-theme=dark] .quiet-details .muted,
+:root[data-theme=dark] .quiet-details p,
+:root[data-theme=dark] .quiet-details li,
+:root[data-theme=dark] .quiet-details .text-button,
+:root[data-theme=dark] .quiet-details .recipe-card,
+:root[data-theme=dark] .quiet-details .recipe-card h3,
+:root[data-theme=dark] .quiet-details .recipe-card p,
+:root[data-theme=dark] .quiet-details .recipe-card small,
+:root[data-theme=dark] .quiet-details .recipe-card .recipe-nutrients{color:#e0ebe4!important}
 :root[data-theme=light] .nav-item.active{background:#e2efe4;color:#145a47}
 :root[data-theme=light] .progress{background:#dce9df}
 :root[data-theme=light] .progress span{background:linear-gradient(90deg,#176b55,#55b58b)}
