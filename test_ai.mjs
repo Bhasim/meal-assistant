@@ -21,4 +21,6 @@ await test('Claude uses only same-origin local relay',async()=>{A.configure({pro
 await test('quota errors are reported without provider/key disclosure',async()=>{status=429;await assert.rejects(()=>A.analyze('meal',image),e=>e.message.includes('حد الاستخدام')&&!e.message.includes(key));status=200;});
 await test('malformed model responses never become nutrition records',()=>{assert.throws(()=>A.parseJSON('not JSON'));assert.throws(()=>A.parseJSON('[]'));assert.equal(A.parseJSON('```json\n{"unclear":true}\n```').unclear,true);});
 await test('disconnect removes authorization for further analysis',async()=>{A.disconnect();assert.equal(A.hasSession(),false);await assert.rejects(()=>A.analyze('meal',image));});
+await test('OCR numeric strings retain decimals and matching basis units',()=>{const x=A.normalizeNutrition({basis:'100 g',unit:'g',kcal:'60',carbs:'5,5',sugar:'٤٫٢',added:null});assert.equal(x.basis,100);assert.equal(x.carbs,5.5);assert.equal(x.sugar,4.2);assert.equal(x.added,null);});
+await test('ambiguous OCR values are rejected instead of guessed',()=>{for(const value of ['5-8','1,000.5','unknown','5 mg'])assert.throws(()=>A.normalizeNutrition({carbs:value}));assert.throws(()=>A.normalizeNutrition({basis:'100 ml',unit:'g'}));});
 console.log(`${passed} AI adapter tests passed; all provider calls mocked, no real credentials used.`);

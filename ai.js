@@ -22,6 +22,18 @@
     if(!result||typeof result!=='object'||Array.isArray(result))throw Error('صيغة التحليل غير متوقعة.');
     return result;
   }
+  function normalizeNutrition(item) {
+    if(!item||typeof item!=='object'||Array.isArray(item))throw Error('نتيجة الصورة غير صالحة.');
+    const out={...item};
+    for(const k of ['basis','amount','kcal','carbs','sugar','added','fiber']) {
+      if(typeof out[k]!=='string')continue;
+      let value=out[k].trim().replace(/[٠-٩]/g,c=>String(c.charCodeAt(0)-1632)).replace(/٫/g,'.');
+      if(k==='basis'&&['g','ml'].includes(out.unit))value=value.replace(new RegExp('\\s*'+out.unit+'$','i'),'').trim();
+      if(!/^(?:\d+(?:[.,]\d+)?|[.,]\d+)$/.test(value))throw Error('صيغة رقم غير واضحة في قراءة الصورة؛ راجع الملصق.');
+      out[k]=Number(value.replace(',','.'));
+    }
+    return out;
+  }
   async function encode(blob) {
     if(!blob||blob.type!=='image/jpeg'||blob.size>5*1024*1024)throw Error('الصورة غير صالحة أو كبيرة جدًا.');
     const bytes=new Uint8Array(await blob.arrayBuffer());let binary='';
@@ -32,7 +44,7 @@
     if(!session)throw Error('اربط خدمة الصور من الإعدادات أولًا.');
     // Snapshot the explicitly selected provider; switching/clearing later never redirects an in-flight upload.
     const config={...session},image=await encode(blob),controller=new AbortController();
-    const timer=setTimeout(()=>controller.abort(),90000);
+    const timer=setTimeout(()=>controller.abort(),150000);
     try{
       let url,body,headers={'Content-Type':'application/json'};
       if(config.provider==='cloudflare'){
@@ -50,7 +62,7 @@
       }
       const response=await fetch(url,{method:'POST',headers,body:JSON.stringify(body),signal:controller.signal,credentials:'omit',cache:'no-store',redirect:'error',referrerPolicy:'no-referrer'});
       if(!response.ok){
-        const messages={400:'رفضت الخدمة الصورة أو النموذج. راجع اسم النموذج وصيغة الصورة.',401:'مفتاح API غير صحيح أو منتهي. أعد ضبطه في الإعدادات.',402:'لا يوجد رصيد أو لم تُتح خطة الاستخدام. لا يوجد انتقال تلقائي لنموذج مدفوع.',403:'حسابك أو منطقتك لا يسمحان بهذا الطلب. راجع إعدادات الخدمة.',404:config.provider==='claude'?'شغّل التطبيق بواسطة python3 server.py لربط Claude.':'النموذج غير موجود أو لم يعد متاحًا. حدّث اسمه في الإعدادات.',429:'بلغت حد الاستخدام أو حد السرعة. انتظر ثم أعد المحاولة؛ لم يتم تفعيل دفع تلقائي من التطبيق.'};
+        const messages={400:'رفضت الخدمة الصورة أو النموذج. راجع اسم النموذج وصيغة الصورة.',401:'مفتاح API غير صحيح أو منتهي. أعد ضبطه في الإعدادات.',402:'لا يوجد رصيد أو لم تُتح خطة الاستخدام. لا يوجد انتقال تلقائي لنموذج مدفوع.',403:'حسابك أو منطقتك لا يسمحان بهذا الطلب. راجع إعدادات الخدمة.',404:config.provider==='claude'?'شغّل التطبيق بواسطة python3 server.py لربط Claude.':'النموذج غير موجود أو لم يعد متاحًا. حدّث اسمه في الإعدادات.',502:'لم تكتمل استجابة خدمة الصور. أعد المحاولة بصورة أوضح؛ لم تُحفظ نتيجة.',503:'خدمة الصور غير متاحة أو انتهت حصتها المجانية. حاول لاحقًا دون تكرار الطلبات بسرعة.',429:'بلغت حد الاستخدام أو حد السرعة. انتظر ثم أعد المحاولة؛ لم يتم تفعيل دفع تلقائي من التطبيق.'};
         throw Error(messages[response.status]||`تعذّر التحليل لدى المزوّد (HTTP ${response.status}). جرّب لاحقًا.`);
       }
       const data=await response.json();
@@ -63,5 +75,5 @@
       throw e;
     }finally{clearTimeout(timer);}
   }
-  globalThis.MealAssistantAI=Object.freeze({configure,disconnect(){session=null;},hasSession(){return Boolean(session);},analyze,parseJSON});
+  globalThis.MealAssistantAI=Object.freeze({configure,disconnect(){session=null;},hasSession(){return Boolean(session);},analyze,parseJSON,normalizeNutrition});
 })();
