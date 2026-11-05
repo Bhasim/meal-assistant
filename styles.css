@@ -111,3 +111,25 @@ body{background:radial-gradient(ellipse 80% 550px at 68% 0,#375c2680,transparent
 /* Light glass surfaces: translucent white with the existing black text. */
 :root[data-theme=light] .quiet-details{background:rgba(255,255,255,.72);border-color:rgba(255,255,255,.8);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
 :root[data-theme=light] .quiet-details .recipe-card{background:rgba(255,255,255,.62);border-color:rgba(255,255,255,.82)}
+
+/* Professional color hierarchy: neutral canvas, one primary green, restrained accents. */
+:root[data-theme=light]{
+  --bg:#f4f7f2;--surface:#ffffff;--text:#111b17;--muted:#52645b;--line:#d9e4dc;
+  --accent:#176b55;--soft:#e7f0e8;--warn:#8b5a16;--warn-bg:#fff4dc;
+  --shadow:0 10px 28px rgba(24,59,46,.08)
+}
+:root[data-theme=light] body{background:radial-gradient(ellipse 90% 420px at 50% -90px,#dcebd566,transparent),var(--bg)}
+:root[data-theme=light] .sidebar{background:rgba(255,255,255,.78);border-color:#d3e0d7}
+:root[data-theme=light] .hero{background:linear-gradient(135deg,#185b4b,#217b65)}
+:root[data-theme=light] .flow-card{background:linear-gradient(135deg,rgba(232,242,228,.88),rgba(255,255,255,.68));border-color:#cfe0d2}
+:root[data-theme=light] .metric{background:rgba(255,255,255,.8);border-color:#d8e4db}
+:root[data-theme=light] .button:not(.secondary){background:linear-gradient(135deg,#176b55,#20856b);color:#fff!important}
+:root[data-theme=light] .button.secondary{background:#e2eee5;color:#145a47;border-color:#cbded0}
+:root[data-theme=light] .photo-card{background:linear-gradient(135deg,rgba(215,235,196,.8),rgba(215,244,236,.62));border-color:#b9d7c2}
+:root[data-theme=light] .notice{background:#e7f0e8;color:#294b3c}
+:root[data-theme=light] .notice.warning{background:#fff4dc;color:#7e5418}
+:root[data-theme=light] .quiet-details{background:rgba(255,255,255,.68);border-color:#d3e3d7}
+:root[data-theme=light] .quiet-details .recipe-card{background:rgba(245,250,245,.74);border-color:#d7e5da}
+:root[data-theme=light] .nav-item.active{background:#e2efe4;color:#145a47}
+:root[data-theme=light] .progress{background:#dce9df}
+:root[data-theme=light] .progress span{background:linear-gradient(90deg,#176b55,#55b58b)}
