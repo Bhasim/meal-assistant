@@ -1,10 +1,11 @@
 /* Bring-your-own-key image adapters. Keys are held only in this closure, never persisted. */
 (function () {
   'use strict';
-  let session = null;
-  const defaults = {openrouter:'openrouter/free',gemini:'gemini-2.5-flash',claude:'claude-haiku-4-5'};
+  let session = {provider:'cloudflare',model:'gemma-4-26b-a4b-it'};
+  const defaults = {cloudflare:'gemma-4-26b-a4b-it',openrouter:'openrouter/free',gemini:'gemini-2.5-flash',claude:'claude-haiku-4-5'};
   function configure({provider,key,model}) {
     if(!Object.hasOwn(defaults,provider))throw Error('الخدمة غير مدعومة.');
+    if(provider==='cloudflare'){session={provider,model:defaults.cloudflare};return;}
     key=String(key||'').trim();model=String(model||defaults[provider]).trim();
     if(key.length<15||key.length>1000||/[\s\x00-\x1f]/.test(key))throw Error('أدخل مفتاح API صحيحًا، وليس كلمة مرور حسابك.');
     if(!/^[a-zA-Z0-9_./:-]{3,120}$/.test(model))throw Error('اسم النموذج غير صالح.');
@@ -34,7 +35,10 @@
     const timer=setTimeout(()=>controller.abort(),90000);
     try{
       let url,body,headers={'Content-Type':'application/json'};
-      if(config.provider==='openrouter'){
+      if(config.provider==='cloudflare'){
+        url='https://meal-assistant-vision.hasimbaha00.workers.dev/';
+        body={prompt,image};
+      }else if(config.provider==='openrouter'){
         url='https://openrouter.ai/api/v1/chat/completions';headers.Authorization='Bearer '+config.key;
         body={model:config.model,max_tokens:4500,messages:[{role:'user',content:[{type:'text',text:prompt},{type:'image_url',image_url:{url:'data:image/jpeg;base64,'+image}}]}]};
       }else if(config.provider==='gemini'){

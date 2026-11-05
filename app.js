@@ -338,8 +338,8 @@
   $('theme-select').onchange=e=>{setTheme(e.target.value);persist();};$('theme').onclick=()=>{setTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');persist();};
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{if(state.theme==='system')setTheme('system');});
   ['meal','label'].forEach(mode=>{$(mode+'-photo').addEventListener('change',photoChange(mode));$('analyze-'+mode).onclick=()=>analyzePhoto(mode);$(mode+'-photo-status').textContent=hasPhotoService()?'خدمة الصور متصلة لهذه الجلسة. راجع النتائج قبل الحفظ.':'الحساب اليدوي يعمل دون إنترنت. اربط خدمة الصور من خطتي وبياناتي لتفعيل التحليل.';});
-    const providers={openrouter:{model:'openrouter/free',note:'نماذج مجانية فقط؛ قد توجد حدود يومية وعدم توافر مؤقت. الصور تُرسل عبر OpenRouter إلى مزوّد النموذج، وتخضع لسياسته.'},gemini:{model:'gemini-2.5-flash',note:'تحقق من أهلية حسابك والتعرفة وشروط Google؛ المجاني ليس مضمونًا لكل بلد أو استخدام. لا ترسل صورًا حساسة إلى مستوى قد يستخدم البيانات لتحسين المنتجات.'},claude:{model:'claude-haiku-4-5',note:'يتطلب رصيد API مستقلًا عن اشتراك الدردشة. شغّل python3 server.py وافتح التطبيق من عنوانه المحلي لربط Claude.'}};
-  function updateProvider(){const p=providers[$('ai-provider').value];$('ai-model').value=p.model;$('ai-provider-note').textContent=p.note;}
+    const providers={cloudflare:{model:'gemma-4-26b-a4b-it',note:'تحليل مستضاف عبر Cloudflare ضمن الحصة اليومية المجانية. يعمل من الهاتف دون مفتاح API أو تشغيل الكمبيوتر. تُرسل الصورة المختارة عند ضغط التحليل؛ راجع النتائج قبل الحفظ.'},openrouter:{model:'openrouter/free',note:'نماذج مجانية فقط؛ قد توجد حدود يومية وعدم توافر مؤقت. الصور تُرسل عبر OpenRouter إلى مزوّد النموذج، وتخضع لسياسته.'},gemini:{model:'gemini-2.5-flash',note:'تحقق من أهلية حسابك والتعرفة وشروط Google؛ المجاني ليس مضمونًا لكل بلد أو استخدام. لا ترسل صورًا حساسة إلى مستوى قد يستخدم البيانات لتحسين المنتجات.'},claude:{model:'claude-haiku-4-5',note:'يتطلب رصيد API مستقلًا عن اشتراك الدردشة. شغّل python3 server.py وافتح التطبيق من عنوانه المحلي لربط Claude.'}};
+  function updateProvider(){const p=providers[$('ai-provider').value];$('ai-model').value=p.model;$('ai-provider-note').textContent=p.note;$('ai-key').disabled=$('ai-provider').value==='cloudflare';}
   function refreshPhotoButtons(){['meal','label'].forEach(mode=>{if(photoData[mode]){$('analyze-'+mode).hidden=!hasPhotoService();if(!photoBusy[mode])$(mode+'-photo-status').textContent=hasPhotoService()?'الصورة جاهزة؛ لن تُرسل إلا عند ضغط التحليل.':'اختر الخدمة ومفتاحها في الإعدادات لتفعيل التحليل.';}});}
   $('ai-provider').addEventListener('change',updateProvider);updateProvider();
   $('ai-form').addEventListener('submit',event=>{
@@ -348,7 +348,7 @@
       if(!$('ai-consent').checked)throw Error('وافق على إرسال الصورة للخدمة عند التحليل أولًا.');
       if(!globalThis.MealAssistantAI)throw Error('ملف ربط الخدمة غير متاح. افتح النسخة الكاملة.');
       globalThis.MealAssistantAI.configure({provider:$('ai-provider').value,key:$('ai-key').value,model:$('ai-model').value});
-      $('ai-key').value='';$('ai-badge').textContent='جاهز للجلسة';$('ai-config-status').textContent='تم تجهيز الربط. لم يُرسل طلب بعد؛ أول تحليل سيتحقق من المفتاح والرصيد وتوافر النموذج.';refreshPhotoButtons();toast('الخدمة جاهزة لهذه الجلسة. لم يُحفظ المفتاح.');
+      $('ai-key').value='';$('ai-badge').textContent='جاهز للجلسة';$('ai-config-status').textContent='تم تفعيل الخدمة لهذه الجلسة. اختر صورة واضغط تحليل، ثم راجع النتيجة قبل الحفظ.';refreshPhotoButtons();toast('الخدمة جاهزة لهذه الجلسة. لم يُحفظ المفتاح.');
     }catch(e){$('ai-config-status').textContent=e.message;}
   });
   $('ai-disconnect').onclick=()=>{globalThis.MealAssistantAI?.disconnect();$('ai-key').value='';$('ai-consent').checked=false;$('ai-badge').textContent='غير متصل';$('ai-config-status').textContent='مُسح المفتاح من ذاكرة التطبيق. أعد إدخاله عند الحاجة.';refreshPhotoButtons();};
