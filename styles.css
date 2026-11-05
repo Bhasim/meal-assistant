@@ -66,3 +66,11 @@ body{background:radial-gradient(ellipse 80% 550px at 68% 0,#375c2680,transparent
 #meal-photo-preview,#label-photo-preview{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-top:10px}
 #meal-photo-preview .photo-preview,#label-photo-preview .photo-preview{height:120px;margin-top:0}
 @media(max-width:760px){#meal-photo-preview,#label-photo-preview{grid-template-columns:repeat(2,minmax(0,1fr))}.reading,.guidance,.quiet-details,.notice,.source-links{padding:14px;font-size:13px}}
+
+/* Restore the original calm reading palette with a more solid surface. */
+.reading,.guidance,.notice,.source-links{background:var(--soft);color:var(--muted)}
+.reading p,.reading li,.guidance p,.guidance li{color:var(--muted)}
+.quiet-details{background:var(--surface);color:var(--muted)}
+.quiet-details p{color:var(--muted)}
+:root[data-theme=dark] .reading,:root[data-theme=dark] .guidance,:root[data-theme=dark] .notice,:root[data-theme=dark] .source-links{background:var(--soft);color:var(--muted)}
+:root[data-theme=dark] .reading p,:root[data-theme=dark] .reading li,:root[data-theme=dark] .guidance p,:root[data-theme=dark] .guidance li,:root[data-theme=dark] .quiet-details p{color:var(--muted)}
