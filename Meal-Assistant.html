@@ -92,6 +92,18 @@ body{background:radial-gradient(ellipse 80% 550px at 68% 0,#375c2680,transparent
 .quiet-details .recipe-card{background:#f3f8ef;border-color:#d5e4d8}
 :root[data-theme=dark] .quiet-details{background:#20382d;border-color:#355244}
 :root[data-theme=dark] .quiet-details .recipe-card{background:#294238;border-color:#426052}
+.metric-good{border-color:#a8d5b5}.metric-good .metric-mini-ring{background:#49a66f}.metric-warning{border-color:#e0c77a}.metric-warning .metric-mini-ring{background:#d49a31}.metric-danger{border-color:#df9a9a}.metric-danger .metric-mini-ring{background:#c85c5c}.metric-neutral .metric-mini-ring{background:var(--muted)}
+:root[data-theme=dark] .metric-good{border-color:#3e7551}:root[data-theme=dark] .metric-warning{border-color:#80652d}:root[data-theme=dark] .metric-danger{border-color:#804646}
+.barcode-tools{margin-bottom:20px}.barcode-row{display:flex;gap:10px;align-items:end}.barcode-row input{flex:1}.barcode-row .button{width:auto;margin:0;white-space:nowrap}.barcode-tools .form-error{margin-top:8px}
+.barcode-video{width:100%;max-height:260px;object-fit:cover;border-radius:16px;margin-top:12px;background:#10231b}
+.glucose-tools{margin-top:20px}.glucose-tools form{align-items:end}.glucose-tools form .button{grid-column:1/-1;width:auto}.glucose-chart{height:180px;margin-top:18px;padding:12px;border-radius:14px;background:var(--soft)}.glucose-chart svg{width:100%;height:130px;display:block;overflow:visible}
+.reminder-tools{margin-top:20px}.reminder-tools form{align-items:end}.reminder-tools form .button{grid-column:1/-1;width:auto}.reminder-row{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding:10px 0}.reminder-row small{display:block;color:var(--muted);font-size:11px}@media(max-width:760px){.reminder-tools form .button{width:100%;min-height:45px}}
+.shopping-tools{margin-top:20px}.shopping-tools form{align-items:end}.shopping-tools form .button{grid-column:1/-1;width:auto}.shopping-row{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding:10px 0}.shopping-row label{display:flex;gap:8px;align-items:center}@media(max-width:760px){.shopping-tools form .button{width:100%;min-height:45px}}
+@media(max-width:760px){.barcode-row{display:grid;grid-template-columns:1fr}.barcode-row .button{width:100%;min-height:45px}}
+.printed-label,.calculated-portion{border:1px solid var(--line);border-radius:14px;padding:14px;margin:12px 0;background:var(--soft)}
+.printed-label h4,.calculated-portion h4{margin:0 0 6px;font-size:15px}
+.printed-label .nutrition-main,.printed-label .nutrition-list{margin-bottom:0}
+:root[data-theme=dark] .printed-label,:root[data-theme=dark] .calculated-portion{background:#20382d;border-color:#355244}
 
 /* Ensure every light surface uses black readable text in light mode. */
 :root[data-theme=light] .card:not(.photo-card),
@@ -322,6 +334,9 @@ body{background:radial-gradient(ellipse 80% 550px at 68% 0,#375c2680,transparent
   'use strict';
   const $ = id => document.getElementById(id);
   const KEY = 'meal-assistant-v2';
+  const DB_NAME = 'meal-assistant-storage';
+  const DB_STORE = 'snapshots';
+  const BACKUP_META_KEY = 'meal-assistant-last-backup';
   const keys = ['kcal', 'carbs', 'sugar', 'added', 'fiber'];
   const slotNames = { breakfast: 'فطور', lunch: 'غداء', dinner: 'عشاء', snack: 'وجبة خفيفة' };
   const nf = new Intl.NumberFormat('ar', { maximumFractionDigits: 1 });
@@ -330,7 +345,7 @@ body{background:radial-gradient(ellipse 80% 550px at 68% 0,#375c2680,transparent
   const dayKey = (d = new Date()) => [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-');
   const uid = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const number = (v, optional = false) => v === '' || v == null ? (optional ? null : NaN) : Number(v);
-  const defaultState = () => ({ version: 2, goals: { kcal: null, carbs: null, added: null, breakfast: null, lunch: null, dinner: null, snack: null }, entries: [], theme: 'dark' });
+  const defaultState = () => ({ version: 3, goals: { kcal: null, carbs: null, added: null, natural: null, breakfast: null, lunch: null, dinner: null, snack: null }, entries: [], glucose: [], reminders: [], shopping: { catalog: [], list: [] }, theme: 'dark' });
   // Representative plain foods, per 100 g cooked/edible weight. Approximate generic values.
   // Nutrition varies with brand, recipe, water content and cooking. Added sugar is 0 only for plain unsweetened foods.
   const foods = [
@@ -401,7 +416,7 @@ body{background:radial-gradient(ellipse 80% 550px at 68% 0,#375c2680,transparent
     return {name:item.name.trim(), basis:item.basis, amount:item.amount, unit:item.unit, ...Object.fromEntries(keys.map(k => [k,item[k] ?? null])), source:String(item.source || 'إدخال المستخدم').slice(0,150)};
   }
   function validateState(raw) {
-    if (!raw || raw.version !== 2 || !Array.isArray(raw.entries) || raw.entries.length > 10000 || !raw.goals) throw Error('ملف النسخة الاحتياطية غير متوافق.');
+    if (!raw || ![2,3].includes(raw.version) || !Array.isArray(raw.entries) || raw.entries.length > 10000 || !raw.goals) throw Error('ملف النسخة الاحتياطية غير متوافق.');
     const clean = defaultState();
     Object.keys(clean.goals).forEach(k => {
       const v = raw.goals[k];
@@ -410,6 +425,10 @@ body{background:radial-gradient(ellipse 80% 550px at 68% 0,#375c2680,transparent
       clean.goals[k] = v ?? null;
     });
     clean.theme = ['system','light','dark'].includes(raw.theme) ? raw.theme : 'system';
+    clean.glucose = Array.isArray(raw.glucose) ? raw.glucose.filter(r=>r&&Number.isFinite(r.value)&&r.value>=0&&r.value<=1000&&/^\d{4}-\d{2}-\d{2}$/.test(r.date)&&['fasting','postmeal','bedtime','random'].includes(r.type)).slice(-2000).map(r=>({id:String(r.id||uid()),date:r.date,time:Number(r.time)||Date.now(),value:r.value,type:r.type,mealId:r.mealId?String(r.mealId):null})) : [];
+    clean.reminders = Array.isArray(raw.reminders) ? raw.reminders.filter(r=>r&&typeof r.title==='string'&&r.title.trim()&&/^\d{4}-\d{2}-\d{2}$/.test(r.date)).slice(-500).map(r=>({id:String(r.id||uid()),title:r.title.trim().slice(0,120),date:r.date,type:['medicine','test','other'].includes(r.type)?r.type:'other'})) : [];
+    const shopping=raw.shopping&&typeof raw.shopping==='object'?raw.shopping:{};
+    clean.shopping={catalog:Array.isArray(shopping.catalog)?shopping.catalog.filter(p=>p&&typeof p.name==='string'&&p.name.trim()).slice(-1000).map(p=>({id:String(p.id||uid()),name:p.name.trim().slice(0,120),category:String(p.category||'أخرى').slice(0,60),store:String(p.store||'غير محدد').slice(0,60),carbs:Number.isFinite(Number(p.carbs))?Number(p.carbs):null,sugar:Number.isFinite(Number(p.sugar))?Number(p.sugar):null})):[],list:Array.isArray(shopping.list)?shopping.list.filter(i=>i&&typeof i.name==='string'&&i.name.trim()).slice(-500).map(i=>({id:String(i.id||uid()),name:i.name.trim().slice(0,120),done:Boolean(i.done)})):[]};
     const ids = new Set();
     clean.entries = raw.entries.map(e => {
       if (!e || typeof e.name !== 'string' || !e.name.trim() || e.name.length > 150 || !/^\d{4}-\d{2}-\d{2}$/.test(e.date) || !Number.isFinite(e.time) || !slotNames[e.slot] || typeof e.id !== 'string' || ids.has(e.id)) throw Error('سجل وجبة غير صالح.');
@@ -443,13 +462,21 @@ body{background:radial-gradient(ellipse 80% 550px at 68% 0,#375c2680,transparent
     });
     state = validateState(migrated);
   }
+  function openDatabase(){return new Promise((resolve,reject)=>{if(!('indexedDB' in globalThis))return reject(Error('IndexedDB غير متاح'));const req=indexedDB.open(DB_NAME,1);req.onupgradeneeded=()=>req.result.createObjectStore(DB_STORE);req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error||Error('تعذر فتح قاعدة البيانات'));});}
+  async function readIndexedState(){try{const db=await openDatabase();return await new Promise((resolve,reject)=>{const req=db.transaction(DB_STORE,'readonly').objectStore(DB_STORE).get(KEY);req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>reject(req.error);});}catch(e){return null;}}
+  async function writeIndexedState(snapshot){try{const db=await openDatabase();await new Promise((resolve,reject)=>{const req=db.transaction(DB_STORE,'readwrite').objectStore(DB_STORE).put(snapshot,KEY);req.onsuccess=resolve;req.onerror=()=>reject(req.error);});if(navigator.storage?.persist)await navigator.storage.persist();return true;}catch(e){return false;}}
+  function backupReminder(){const last=Number(localStorage.getItem(BACKUP_META_KEY)||0);const overdue=!last||Date.now()-last>7*86400000;const el=$('backup-status');if(el&&overdue)el.textContent='تذكير: نزّل نسخة JSON احتياطية مرة كل أسبوع لحماية سجلّك.';}
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) state = validateState(JSON.parse(raw));
-    else { migrateLegacy(); localStorage.setItem(KEY,JSON.stringify(state)); }
+    else { migrateLegacy(); state.version=3; localStorage.setItem(KEY,JSON.stringify(state)); }
   } catch (e) { storageOK=false; }
+  readIndexedState().then(snapshot=>{if(!snapshot)return;try{const candidate=validateState(snapshot);if(candidate.entries.length>=state.entries.length){state=candidate;setTheme(state.theme);fillSettings();renderDashboard();renderLog();updateMeal();}}catch(e){/* keep validated localStorage copy */}});
+  backupReminder();
   function persist() {
-    try { localStorage.setItem(KEY,JSON.stringify(state)); storageOK=true; } catch(e) { storageOK=false; }
+    const snapshot=JSON.stringify(state);
+    try { localStorage.setItem(KEY,snapshot); storageOK=true; } catch(e) { storageOK=false; }
+    writeIndexedState(state).then(ok=>{if(!ok&&!storageOK)$('storage-warning').hidden=false;});
     $('storage-warning').hidden=storageOK;
   }
   function toast(message) {
@@ -467,7 +494,8 @@ body{background:radial-gradient(ellipse 80% 550px at 68% 0,#375c2680,transparent
   }
   function metric(title, value, unit, detail, goal, unknown=false, unknownOnly=false) {
     const percent=goal != null && goal>0 ? Math.min(100,value/goal*100) : 0;
-    return `<article class="metric"><span class="metric-mini-ring" aria-hidden="true"></span><div class="metric-title"><span class="metric-icon" aria-hidden="true">${icon(title.includes('سعر')?'flame':title.includes('مضاف')?'plus':title.includes('سكر')?'drop':'carbs')}</span>${title}</div><div class="metric-value">${unknownOnly?'غير معروف':(unknown?'≥ ':'')+fmt(value)} <small>${unit}</small></div><div class="metric-detail">${esc(detail)}</div><div class="progress ${goal!=null&&value>goal?'over':''}" aria-hidden="true"><span style="width:${percent}%"></span></div></article>`;
+    const status=goal==null||unknownOnly?'neutral':value>goal?'danger':value>=goal*.8?'warning':'good';
+    return `<article class="metric metric-${status}"><span class="metric-mini-ring" aria-hidden="true"></span><div class="metric-title"><span class="metric-icon" aria-hidden="true">${icon(title.includes('سعر')?'flame':title.includes('مضاف')?'plus':title.includes('سكر')?'drop':'carbs')}</span>${title}</div><div class="metric-value">${unknownOnly?'غير معروف':(unknown?'≥ ':'')+fmt(value)} <small>${unit}</small></div><div class="metric-detail">${esc(detail)}</div><div class="progress ${goal!=null&&value>goal?'over':''}" aria-hidden="true"><span style="width:${percent}%"></span></div></article>`;
   }
   const entriesFor = date => state.entries.filter(e => e.date===date);
   const entryTotals = entries => totals(entries.flatMap(e => e.items?.length ? e.items.map(scale) : [e]));
@@ -479,7 +507,9 @@ body{background:radial-gradient(ellipse 80% 550px at 68% 0,#375c2680,transparent
   }
   function dailyCards(entries) {
     const t=entryTotals(entries),g=state.goals;
-    return metric('السعرات',t.kcal,'kcal',goalDetail(t.kcal,g.kcal),g.kcal)+metric('الكربوهيدرات الكلية',t.carbs,'غ',goalDetail(t.carbs,g.carbs),g.carbs)+metric('السكريات الكلية',t.sugar,'غ','جزء من الكربوهيدرات • لا تُجمع معها',null)+metric('السكر المضاف',t.added,'غ',goalDetail(t.added,g.added,t.addedUnknown),g.added,t.addedUnknown,t.addedUnknown&&!t.addedKnown);
+    const natural=t.sugar!=null&&t.added!=null?Math.max(0,t.sugar-t.added):null,naturalUnknown=t.sugarUnknown||t.addedUnknown;
+    const naturalDetail=naturalUnknown?'السكر الطبيعي غير مكتمل؛ راجع الملصق':goalDetail(natural,g.natural);
+    return metric('السعرات',t.kcal,'kcal',goalDetail(t.kcal,g.kcal),g.kcal)+metric('الكربوهيدرات الكلية',t.carbs,'غ',goalDetail(t.carbs,g.carbs),g.carbs)+metric('السكريات الكلية',t.sugar,'غ','جزء من الكربوهيدرات • لا تُجمع معها',null)+metric('السكر المضاف',t.added,'غ',goalDetail(t.added,g.added,t.addedUnknown),g.added,t.addedUnknown,t.addedUnknown&&!t.addedKnown)+metric('السكر الطبيعي',natural,'غ',naturalDetail,g.natural,naturalUnknown,naturalUnknown&&!natural);
   }
   function renderDashboard() {
     const today=dayKey();
@@ -553,7 +583,8 @@ body{background:radial-gradient(ellipse 80% 550px at 68% 0,#375c2680,transparent
       const nutrients=validNutrition(formNutrients('label')),basis=number($('label-basis').value),amount=number($('label-amount').value)*number($('label-count').value);
       labelItem=validateItem({name:$('label-name').value,basis,amount,unit:$('label-unit').value,...nutrients,source:'ملصق أدخله المستخدم؛ راجع الأرقام'});
       const t=totals([scale(labelItem)]);
-      $('label-result').innerHTML=`<h3>${esc(labelItem.name)}</h3><p class="small muted">لـ ${fmt(amount)} ${labelItem.unit==='ml'?'مل':'غ'} • القيم الأصلية لكل ${fmt(basis)} ${labelItem.unit==='ml'?'مل':'غ'}</p>${nutritionHTML(t)}${mealGuidance([labelItem],$('meal-slot').value)}<p class="small">المقارنة لهدف ${slotNames[$('meal-slot').value]} المحدد في صفحة حساب وجبة.</p><button id="label-to-meal" class="button">أضف هذه الحصة إلى الوجبة</button><p class="small muted">ستراجع الوجبة قبل حفظها في السجل.</p>`;
+      $('label-result').innerHTML=`<h3>${esc(labelItem.name)}</h3><section class="printed-label"><h4>ما هو مكتوب على الملصق</h4><p class="small muted">القيم المطبوعة لكل ${fmt(basis)} ${labelItem.unit==='ml'?'مل':'غ'} — لا تمثل كامل العبوة.</p>${nutritionHTML(totals([{...labelItem,amount:basis}]))}</section><section class="calculated-portion"><h4>القيم المحسوبة للكمية التي حددتها</h4><p class="small muted">المجموع التالي للكمية المُدخلة فقط: ${fmt(amount)} ${labelItem.unit==='ml'?'مل':'غ'}، وليس لكامل العبوة.</p>${nutritionHTML(t)}${mealGuidance([labelItem],$('meal-slot').value)}</section><p class="small">المقارنة لهدف ${slotNames[$('meal-slot').value]} المحدد في صفحة حساب وجبة.</p><button id="re-evaluate-label" type="button" class="button secondary">أعد التقييم بعد تعديل الأرقام</button><button id="label-to-meal" class="button">أضف هذه الحصة إلى الوجبة</button><p class="small muted">ستراجع الوجبة قبل حفظها في السجل.</p>`;
+      $('re-evaluate-label').onclick=()=>calculateLabel({preventDefault(){}});
     }catch(e){$('label-error').textContent=e.message;}
   }
   function customSubmit(event) {
@@ -568,8 +599,21 @@ body{background:radial-gradient(ellipse 80% 550px at 68% 0,#375c2680,transparent
       return `<article class="log-card"><header><div><h3>${esc(e.name)}</h3><span class="log-meta">${slotNames[e.slot]} • ${new Date(e.time).toLocaleTimeString('ar',{hour:'2-digit',minute:'2-digit'})}</span></div><button class="text-button danger" data-delete="${esc(e.id)}">حذف</button></header><div class="nutrition-list">${[['kcal','سعرة'],['carbs','غ كربوهيدرات'],['sugar','غ سكريات كلية'],['added','غ سكر مضاف'],['fiber','غ ألياف']].map(([k,u])=>`<div class="nutrition-row"><span>${u}${t[k+'Unknown']?' (مجموع المعروف)':''}</span><strong>${valueText(t,k)}</strong></div>`).join('')}</div><details><summary>المكونات ومصدر القيم</summary><p>${esc(e.source)}</p>${e.items.length?e.items.map(i=>`<p>${esc(i.name)} • ${fmt(i.amount)} ${i.unit==='ml'?'مل':'غ'}<br><small>${esc(i.source)}</small></p>`).join(''):'<p>لا تتوفر تفاصيل المكونات لهذا السجل القديم.</p>'}</details></article>`;
     }).join(''):'<div class="empty-state"><span aria-hidden="true">▥</span><h3>لا توجد وجبات لهذا اليوم</h3><p>يمكنك تسجيل وجبة من قسم حساب الوجبة.</p></div>';
     $('week-table').innerHTML=Array.from({length:7},(_,i)=>{const d=new Date();d.setDate(d.getDate()-i);const list=entriesFor(dayKey(d)),t=entryTotals(list);return `<tr><td>${d.toLocaleDateString('ar',{weekday:'short',day:'numeric',month:'numeric'})}</td><td>${fmt(t.kcal)}</td><td>${fmt(t.carbs)}</td><td>${fmt(t.sugar)}</td><td>${valueText(t,'added')}${t.addedUnknown?' *':''}</td></tr>`;}).join('');
+    renderGlucose();
   }
-  function fillSettings(){Object.keys(state.goals).forEach(k=>{$('goal-'+k).value=state.goals[k]??'';});$('theme-select').value=state.theme;}
+  function ensureGlucoseTools(){if($('glucose-tools')||!$('page-log')||!document.createElement)return;const box=document.createElement('article');box.id='glucose-tools';box.className='card glucose-tools';box.innerHTML='<div class="section-heading"><div><h2>متابعة سكر الدم</h2><p class="small muted">سجل قراءاتك كما حددها الطبيب. التطبيق لا يفسر القراءة كتشخيص ولا يغير العلاج.</p></div></div><form id="glucose-form" class="form-grid"><div><label for="glucose-value">القراءة</label><input id="glucose-value" type="number" min="0" max="1000" step="any" required placeholder="mg/dL"></div><div><label for="glucose-type">نوع القراءة</label><select id="glucose-type"><option value="fasting">صائم</option><option value="postmeal">بعد الوجبة بساعتين</option><option value="bedtime">قبل النوم</option><option value="random">عشوائية</option></select></div><div><label for="glucose-date">التاريخ</label><input id="glucose-date" type="date" required></div><div><label for="glucose-meal">وجبة مرتبطة (اختياري)</label><select id="glucose-meal"><option value="">بدون ربط</option></select></div><button class="button" type="submit">حفظ القراءة</button></form><div id="glucose-chart" class="glucose-chart"></div><p id="glucose-status" class="small muted" role="status"></p>';$('page-log').append(box);$('glucose-date').value=dayKey();$('glucose-form').onsubmit=saveGlucose;}
+  function renderGlucose(){if(!$('glucose-chart'))return;const select=$('glucose-meal');if(select){select.innerHTML='<option value="">بدون ربط</option>'+state.entries.slice(-30).reverse().map(e=>`<option value="${esc(e.id)}">${esc(e.date)} — ${esc(e.name)}</option>`).join('');}const list=(state.glucose||[]).slice(-14);if(!list.length){$('glucose-chart').innerHTML='<p class="empty-state">لا توجد قراءات بعد.</p>';return;}const max=Math.max(...list.map(r=>r.value),1),points=list.map((r,i)=>`${(i/(Math.max(list.length-1,1))*100).toFixed(1)},${(100-r.value/max*82-9).toFixed(1)}`).join(' ');$('glucose-chart').innerHTML=`<svg viewBox="0 0 100 100" role="img" aria-label="رسم القراءات الأخيرة"><polyline points="${points}" fill="none" stroke="var(--accent)" stroke-width="2" vector-effect="non-scaling-stroke"/>${list.map((r,i)=>`<circle cx="${(i/(Math.max(list.length-1,1))*100).toFixed(1)}" cy="${(100-r.value/max*82-9).toFixed(1)}" r="1.8" fill="var(--lime)"/>`).join('')}</svg><p class="small">آخر ${fmt(list.length)} قراءة. المتوسط: ${fmt(list.reduce((s,r)=>s+r.value,0)/list.length)} mg/dL. حدّد نطاقك مع طبيبك؛ لا يوجد نطاق افتراضي في التطبيق.</p>`;}
+  function saveGlucose(event){event.preventDefault();const value=Number($('glucose-value').value),date=$('glucose-date').value;if(!Number.isFinite(value)||value<0||value>1000||!date){$('glucose-status').textContent='أدخل قراءة وتاريخًا صحيحين.';return;}state.glucose.push({id:uid(),date,time:Date.now(),value,type:$('glucose-type').value,mealId:$('glucose-meal').value||null});persist();$('glucose-value').value='';$('glucose-status').textContent='تم حفظ القراءة محليًا. راجع طبيبك عند وجود قراءة مقلقة أو أعراض شديدة.';renderGlucose();}
+  function ensureReminderTools(){if($('reminder-tools')||!$('page-settings')||!document.createElement)return;const box=document.createElement('article');box.id='reminder-tools';box.className='card reminder-tools';box.innerHTML='<h2>المستحق قريبًا</h2><p class="small muted">أدخل مواعيدك بنفسك. إشعارات Safari على iPhone قد تكون محدودة، لذلك يمكنك تصديرها للتقويم.</p><form id="reminder-form" class="form-grid"><div><label for="reminder-title">العنوان</label><input id="reminder-title" required maxlength="120" placeholder="مثل: فحص السكر التراكمي"></div><div><label for="reminder-type">النوع</label><select id="reminder-type"><option value="medicine">دواء (موعد أدخله أنت)</option><option value="test">فحص دوري</option><option value="other">موعد آخر</option></select></div><div><label for="reminder-date">التاريخ</label><input id="reminder-date" type="date" required></div><button class="button" type="submit">إضافة الموعد</button></form><div id="reminder-list"></div><button id="export-ics" type="button" class="button secondary">تصدير مواعيدي إلى التقويم (.ics)</button><p id="reminder-status" class="small" role="status"></p>';$('page-settings').append(box);$('reminder-form').onsubmit=saveReminder;$('export-ics').onclick=exportICS;renderReminders();}
+  function renderReminders(){if(!$('reminder-list'))return;const labels={medicine:'دواء',test:'فحص',other:'موعد'};$('reminder-list').innerHTML=(state.reminders||[]).slice().sort((a,b)=>a.date.localeCompare(b.date)).map(r=>`<div class="reminder-row"><span><b>${esc(r.title)}</b><small>${labels[r.type]} • ${esc(r.date)}</small></span><button class="text-button danger" data-reminder-delete="${esc(r.id)}">حذف</button></div>`).join('')||'<p class="small muted">لا توجد مواعيد مضافة.</p>';}
+  function saveReminder(event){event.preventDefault();const title=$('reminder-title').value.trim(),date=$('reminder-date').value;if(!title||!date)return;state.reminders.push({id:uid(),title,date,type:$('reminder-type').value});persist();$('reminder-form').reset();renderReminders();$('reminder-status').textContent='تم حفظ الموعد على هذا الجهاز.';}
+  function exportICS(){const escICS=s=>String(s).replace(/[\\;,]/g,'\\$&').replace(/\r?\n/g,'\\n');const body=(state.reminders||[]).map(r=>`BEGIN:VEVENT\r\nUID:${r.id}@meal-assistant\r\nDTSTART;VALUE=DATE:${r.date.replaceAll('-','')}\r\nSUMMARY:${escICS(r.title)}\r\nEND:VEVENT`).join('\r\n');download(`BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Meal Assistant//AR\r\n${body}\r\nEND:VCALENDAR\r\n`,'meal-assistant-reminders.ics','text/calendar;charset=utf-8');}
+  function ensureShoppingTools(){if($('shopping-tools')||!$('page-settings')||!document.createElement)return;const box=document.createElement('article');box.id='shopping-tools';box.className='card shopping-tools';box.innerHTML='<h2>تسوق ذكي</h2><p class="small muted">أضف منتجات موثوقة بنفسك؛ لن نخترع منتجات أو أسعارًا.</p><form id="shopping-form" class="form-grid"><div><label for="shopping-name">اسم المنتج</label><input id="shopping-name" required maxlength="120"></div><div><label for="shopping-category">الفئة</label><input id="shopping-category" placeholder="مثل: ألبان"></div><div><label for="shopping-store">المتجر</label><input id="shopping-store" placeholder="Lidl / Aldi / Penny / Edeka"></div><button class="button" type="submit">إضافة للقائمة</button></form><div id="shopping-list"></div><button id="print-report" type="button" class="button secondary">طباعة تقرير للطبيب</button><p id="shopping-status" class="small" role="status"></p>';$('page-settings').append(box);$('shopping-form').onsubmit=saveShoppingItem;$('print-report').onclick=printDoctorReport;renderShopping();}
+  function renderShopping(){if(!$('shopping-list'))return;const list=state.shopping?.list||[];$('shopping-list').innerHTML=list.map(i=>`<div class="shopping-row"><label><input type="checkbox" data-shopping-done="${esc(i.id)}" ${i.done?'checked':''}> ${esc(i.name)}</label><button class="text-button danger" data-shopping-delete="${esc(i.id)}">حذف</button></div>`).join('')||'<p class="small muted">قائمة المشتريات فارغة.</p>';}
+  function saveShoppingItem(event){event.preventDefault();const name=$('shopping-name').value.trim();if(!name)return;state.shopping.list.push({id:uid(),name,done:false});persist();$('shopping-form').reset();renderShopping();$('shopping-status').textContent='تمت الإضافة محليًا.';}
+  function printDoctorReport(){const readings=state.glucose||[],avg=readings.length?readings.reduce((s,r)=>s+r.value,0)/readings.length:null;const rows=(state.entries||[]).slice(-30).map(e=>`<tr><td>${esc(e.date)}</td><td>${esc(e.name)}</td><td>${fmt(entryTotals([e]).carbs)} g</td></tr>`).join('');const html=`<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><title>تقرير وجباتي</title><style>body{font-family:Arial;line-height:1.7;margin:32px;color:#17231d}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccd8cf;padding:8px}h1{color:#145e50}</style><h1>تقرير وجباتي / Meal Assistant</h1><p>للمراجعة مع الطبيب، وليس تشخيصًا أو بديلًا عن الرعاية الطبية.</p><h2>سكر الدم / Glucose</h2><p>عدد القراءات: ${readings.length} — المتوسط: ${avg==null?'غير متوفر':fmt(avg)+' mg/dL'}</p><h2>الوجبات / Meals</h2><table><tr><th>التاريخ</th><th>الوجبة</th><th>الكربوهيدرات</th></tr>${rows||'<tr><td colspan="3">لا توجد بيانات</td></tr>'}</table><script>window.print()<\\/script></html>`;const w=window.open('','_blank');if(w){w.document.write(html);w.document.close();}}
+  function ensureNaturalGoalField(){if($('goal-natural')||!document.createElement)return;const anchor=$('goal-added');if(!anchor)return;const wrap=document.createElement('div');wrap.innerHTML='<label for="goal-natural">هدف السكر الطبيعي (غ، اختياري)</label><input id="goal-natural" type="number" min="0" max="1000" step="any" placeholder="غير محدد">';anchor.closest?.('div')?.after(wrap);}
+  function fillSettings(){ensureNaturalGoalField();Object.keys(state.goals).forEach(k=>{const el=$('goal-'+k);if(el)el.value=state.goals[k]??'';});$('theme-select').value=state.theme;}
   function saveSettings(event) {
     event.preventDefault();$('settings-error').textContent='';
     try {
@@ -586,7 +630,12 @@ body{background:radial-gradient(ellipse 80% 550px at 68% 0,#375c2680,transparent
   function download(content,name,type) {
     const blob=new Blob([content],{type}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),10000);
   }
-  function exportJSON(){download(JSON.stringify({...state,exportedAt:new Date().toISOString()},null,2),`meal-assistant-backup-${dayKey()}.json`,'application/json;charset=utf-8');}
+  function exportJSON(){download(JSON.stringify({...state,version:3,exportedAt:new Date().toISOString()},null,2),`meal-assistant-backup-${dayKey()}.json`,'application/json;charset=utf-8');localStorage.setItem(BACKUP_META_KEY,String(Date.now()));$('backup-status').textContent='تم تنزيل نسخة JSON. كرر النسخ الاحتياطي مرة كل أسبوع.';}
+  function ensureBarcodeTools(){if($('barcode-tools')||!$('page-label'))return;const box=document.createElement('article');box.id='barcode-tools';box.className='card barcode-tools';box.innerHTML='<div class="section-heading"><h2>البحث بالباركود</h2><span class="step">01</span></div><p class="small muted">أدخل رقم الباركود أو استخدم كاميرا الهاتف. لا نضيف قيمًا ناقصة أو غير مؤكدة.</p><div class="barcode-row"><input id="barcode-input" inputmode="numeric" pattern="[0-9]*" maxlength="14" placeholder="رقم الباركود" aria-label="رقم الباركود"><button id="barcode-search" type="button" class="button compact">بحث</button><button id="barcode-camera" type="button" class="button secondary compact">مسح بالكاميرا</button></div><video id="barcode-video" class="barcode-video" playsinline muted hidden></video><p id="barcode-status" class="small" role="status"></p></article>';$('page-label').prepend(box);$('barcode-search').onclick=lookupBarcode;$('barcode-camera').onclick=startBarcodeScanner;}
+  async function startBarcodeScanner(){const status=$('barcode-status'),video=$('barcode-video');try{if(!navigator.mediaDevices?.getUserMedia)throw Error('الكاميرا غير متاحة في هذا المتصفح. أدخل الرقم يدويًا.');status.textContent='جارٍ تحميل قارئ الباركود…';const mod=await import('https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/+esm');const reader=new mod.BrowserMultiFormatReader();video.hidden=false;video.srcObject=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}}});await video.play();status.textContent='وجّه الكاميرا إلى الباركود.';const result=await reader.decodeOnceFromVideoDevice(undefined,video);const code=result?.getText?.()||'';$('barcode-input').value=code;video.srcObject?.getTracks().forEach(t=>t.stop());video.srcObject=null;video.hidden=true;status.textContent='تمت قراءة الباركود؛ جارٍ البحث…';await lookupBarcode();}catch(e){video.srcObject?.getTracks().forEach(t=>t.stop());video.srcObject=null;video.hidden=true;status.textContent=e.message||'تعذّر تشغيل الكاميرا. استخدم الإدخال اليدوي.';}}
+  async function lookupBarcode(){const input=$('barcode-input'),status=$('barcode-status'),code=(input.value||'').replace(/\D/g,'');if(!/^\d{8,14}$/.test(code)){status.textContent='أدخل رقم باركود صحيحًا من 8 إلى 14 رقمًا.';return;}const cacheKey='meal-assistant-off-'+code;try{const cached=JSON.parse(localStorage.getItem(cacheKey)||'null');if(cached){applyBarcodeProduct(cached,true);return;}}catch(e){}
+    status.textContent='جارٍ البحث في Open Food Facts…';try{const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),12000);const res=await fetch('https://world.openfoodfacts.org/api/v2/product/'+encodeURIComponent(code)+'.json?fields=product_name,product_name_ar,brands,nutriments,serving_size,serving_quantity',{signal:controller.signal,credentials:'omit',cache:'no-store'});clearTimeout(timer);if(!res.ok)throw Error('تعذر الاتصال بقاعدة المنتجات.');const data=await res.json();if(data.status!==1||!data.product)throw Error('لم يُعثر على هذا المنتج. أدخل القيم من الملصق يدويًا.');const p=data.product;const n=p.nutriments||{};const item={name:p.product_name_ar||p.product_name||'',basis:100,unit:'g',kcal:Number(n['energy-kcal_100g']),carbs:Number(n.carbohydrates_100g),sugar:Number(n.sugars_100g),added:n['added-sugars_100g']==null?null:Number(n['added-sugars_100g']),fiber:n.fiber_100g==null?null:Number(n.fiber_100g)};if(!item.name||![item.kcal,item.carbs,item.sugar].every(Number.isFinite))throw Error('المنتج موجود، لكن بياناته الغذائية الأساسية ناقصة. أدخلها من الملصق يدويًا.');localStorage.setItem(cacheKey,JSON.stringify(item));applyBarcodeProduct(item,false);}catch(e){status.textContent=e.name==='AbortError'?'انتهت مهلة البحث. جرّب مرة أخرى أو أدخل القيم يدويًا.':e.message;}}
+  function applyBarcodeProduct(item,cached){$('label-name').value=item.name;$('label-basis').value=item.basis;$('label-unit').value=item.unit;$('label-amount').value=item.basis;$('label-count').value=1;keys.forEach(k=>{$('label-'+k).value=item[k]??'';});$('barcode-status').textContent=(cached?'تم استخدام نسخة محفوظة محليًا. ':'تم العثور على المنتج. ')+ 'راجع كل القيم المطبوعة ثم اضغط «احسب حصتي».';}
   function exportCSV() {
     const cell=v=>{let s=String(v??'');if(/^[=+@\-\t\r]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"';};
     const rows=[['date','meal','type','kcal','total_carbohydrates_g','total_sugars_g','added_sugars_g','fiber_g','notes']];
@@ -599,7 +648,7 @@ body{background:radial-gradient(ellipse 80% 550px at 68% 0,#375c2680,transparent
       if(file.size>10*1024*1024)throw Error('الملف أكبر من الحد المسموح (10 ميجابايت).');
       const incoming=validateState(JSON.parse(await file.text()));
       if(!confirm('سيستبدل الاستيراد السجل والأهداف الحالية. هل حفظت نسخة احتياطية وتريد المتابعة؟'))return;
-      state=incoming;persist();fillSettings();setTheme(state.theme);renderDashboard();renderLog();updateMeal();$('backup-status').textContent='تم استيراد النسخة بنجاح.';toast('تم استيراد البيانات.');
+      state=incoming;persist();fillSettings();setTheme(state.theme);renderDashboard();renderLog();updateMeal();localStorage.setItem(BACKUP_META_KEY,String(Date.now()));$('backup-status').textContent='تم استيراد النسخة بنجاح. أعد تصدير نسخة جديدة بعد التعديلات المهمة.';toast('تم استيراد البيانات.');
     }catch(e){$('backup-status').textContent='تعذّر الاستيراد: '+e.message;}
   }
   function clearPhoto(mode){(photoData[mode]||[]).forEach(p=>p.url&&URL.revokeObjectURL(p.url));delete photoData[mode];$(mode+'-photo-preview').replaceChildren();$(mode+'-photo').value='';$('analyze-'+mode).hidden=true;$(mode+'-photo-status').textContent='';}
@@ -663,6 +712,9 @@ body{background:radial-gradient(ellipse 80% 550px at 68% 0,#375c2680,transparent
     const preset=e.target.closest('[data-preset]');if(preset){const p=presets[Number(preset.dataset.preset)];draft.push(...p.items.map(i=>validateItem({...globalThis.MealAssistantAI.normalizeNutrition(i),source:i.source+'؛ نموذج تقريبي قابل للتعديل'})));$('meal-name').value=p.name;renderIngredients();go('meal');toast('أُضيفت مكونات نموذجية للمراجعة. عدّل الكمية وفق وجبتك الفعلية.');return;}
     const remove=e.target.closest('[data-remove]');if(remove){draft.splice(Number(remove.dataset.remove),1);renderIngredients();return;}
     const del=e.target.closest('[data-delete]');if(del&&confirm('حذف هذه الوجبة من السجل؟')){state.entries=state.entries.filter(x=>x.id!==del.dataset.delete);persist();renderLog();renderDashboard();updateMeal();return;}
+    const reminderDelete=e.target.closest('[data-reminder-delete]');if(reminderDelete){state.reminders=state.reminders.filter(x=>x.id!==reminderDelete.dataset.reminderDelete);persist();renderReminders();return;}
+    const shopDelete=e.target.closest('[data-shopping-delete]');if(shopDelete){state.shopping.list=state.shopping.list.filter(x=>x.id!==shopDelete.dataset.shoppingDelete);persist();renderShopping();return;}
+    const shopDone=e.target.closest('[data-shopping-done]');if(shopDone){const item=state.shopping.list.find(x=>x.id===shopDone.dataset.shoppingDone);if(item){item.done=shopDone.checked;persist();}return;}
     if(e.target.id==='label-to-meal'&&labelItem){addDraft({...labelItem});labelItem=null;e.target.disabled=true;go('meal');}
   });
   $('ingredients').addEventListener('input',e=>{
@@ -698,7 +750,7 @@ body{background:radial-gradient(ellipse 80% 550px at 68% 0,#375c2680,transparent
   const navIcons={dashboard:'home',meal:'sparkles',label:'scan',log:'chart',settings:'settings'};
   document.querySelectorAll('[data-page]').forEach(el=>{const label=el.textContent.replace(/^[◫＋▤▥⚙]\s*/, '').trim();el.setAttribute('aria-label',label);el.innerHTML=`<span aria-hidden="true">${icon(navIcons[el.dataset.page])}</span><span class="nav-label">${esc(label)}</span>`;});
   document.querySelectorAll('.brand-mark').forEach(el=>{el.innerHTML=icon('leaf');});
-  $('theme').innerHTML=icon('moon');hydrateIcons();renderRecipes();
+  $('theme').innerHTML=icon('moon');hydrateIcons();renderRecipes();ensureBarcodeTools();ensureGlucoseTools();ensureReminderTools();ensureShoppingTools();
   $('storage-warning').hidden=storageOK;setTheme(state.theme);fillSettings();renderFoods();renderIngredients();renderDashboard();renderLog();go(location.hash.slice(1)||'dashboard');
   // Refresh the date after midnight or returning from a suspended mobile browser.
   let shownDay=dayKey();
