@@ -6,7 +6,7 @@ import mimetypes
 
 ROOT = Path(__file__).resolve().parent
 page = (ROOT / 'index.html').read_text(encoding='utf-8')
-page = page.replace('app.js?v=glass1','app.js').replace('ai.js?v=glass1','ai.js').replace('styles.css?v=glass1','styles.css')
+page = page.replace('app.js?v=themefix2','app.js').replace('ai.js?v=themefix2','ai.js').replace('styles.css?v=themefix2','styles.css')
 page = page.replace('<link rel="stylesheet" href="styles.css">', '<style>\n' + (ROOT / 'styles.css').read_text(encoding='utf-8') + '\n</style>')
 page = page.replace('<script src="ai.js"></script>', '<script>\n' + (ROOT / 'ai.js').read_text(encoding='utf-8') + '\n</script>')
 page = page.replace('<script src="app.js"></script>', '<script>\n' + (ROOT / 'app.js').read_text(encoding='utf-8') + '\n</script>')
