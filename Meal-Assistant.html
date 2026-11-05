@@ -93,6 +93,30 @@ body{background:radial-gradient(ellipse 80% 550px at 68% 0,#375c2680,transparent
 :root[data-theme=dark] .quiet-details{background:#20382d;border-color:#355244}
 :root[data-theme=dark] .quiet-details .recipe-card{background:#294238;border-color:#426052}
 
+/* Ensure every light surface uses black readable text in light mode. */
+:root[data-theme=light] .card:not(.photo-card),
+:root[data-theme=light] .metric,
+:root[data-theme=light] .flow-card,
+:root[data-theme=light] .recipe-card,
+:root[data-theme=light] .quiet-details,
+:root[data-theme=light] .food-option{
+  color:#111;
+}
+:root[data-theme=light] .card:not(.photo-card) h1,
+:root[data-theme=light] .card:not(.photo-card) h2,
+:root[data-theme=light] .card:not(.photo-card) h3,
+:root[data-theme=light] .card:not(.photo-card) p,
+:root[data-theme=light] .card:not(.photo-card) label,
+:root[data-theme=light] .card:not(.photo-card) .muted,
+:root[data-theme=light] .metric .metric-title,
+:root[data-theme=light] .metric .metric-detail,
+:root[data-theme=light] .flow-card p,
+:root[data-theme=light] .recipe-card p,
+:root[data-theme=light] .recipe-card small,
+:root[data-theme=light] .food-option small{
+  color:#111;
+}
+
 </style>
 </head>
 <body>
